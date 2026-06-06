@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 from typing import Any, Dict, Optional, Tuple, cast
 
@@ -23,12 +25,13 @@ __all__: Tuple[str, ...] = ("RedCommandAdapter", "RedBotAdapter")
 
 
 class RedCommandAdapter(SimpleAdapter["Command"]):
-    if not _has_redbot:
-        raise ImportError("A Red-DiscordBot instance is required to use this.", name="redbot")
-
     def __init__(self, base: Command, *, signature: Optional[str] = None) -> None:
-        super().__init__(base=base)
+        if not _has_redbot:
+            raise ImportError(
+                "A Red-DiscordBot instance is required to use this.", name="redbot"
+            )
         self.signature: Optional[str] = signature
+        super().__init__(base=base)
 
     def update_attributes(self) -> None:
         command: Command = self.object
@@ -106,12 +109,11 @@ class RedBotAdapter(SimpleAdapter["Red"]):
         Attributes denoting ``(*)`` can only be used by the bot owner.
     """
 
-    if not _has_redbot:
-        raise ImportError("A Red-DiscordBot instance is required to use this.")
-
     def __init__(self, base: Red, *, owner: bool = True) -> None:
-        super().__init__(base=base)
+        if not _has_redbot:
+            raise ImportError("A Red-DiscordBot instance is required to use this.")
         self.is_owner: bool = owner
+        super().__init__(base=base)
 
     def update_attributes(self) -> None:
         self.user: discord.ClientUser = cast(discord.ClientUser, self.object.user)

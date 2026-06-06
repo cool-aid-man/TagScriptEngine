@@ -181,7 +181,7 @@ __all__: Tuple[str, ...] = (
 )
 
 
-__version__: Final[str] = "3.3.0"
+__version__: Final[str] = "3.3.1"
 
 
 class VersionNamedTuple(NamedTuple):
