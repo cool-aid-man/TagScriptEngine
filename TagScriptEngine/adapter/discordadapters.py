@@ -103,7 +103,6 @@ class DiscordAttributeAdapter(
     ]
 ):
     """
-    .. versionadded:: 3.2.0
     """
 
     def __init__(
@@ -191,7 +190,6 @@ class UserAdapter(DiscordAttributeAdapter):
     avatar_decoration
         A link to the user's avatar decoration.
 
-    .. versionadded:: 3.2.0
     """
 
     def update_attributes(self) -> None:
@@ -260,16 +258,26 @@ class MemberAdapter(DiscordAttributeAdapter):
         If the user has boosted, this will be the UTC timestamp of when they did,
         if not this will be empty.
     timed_out
-        If the user is timed out, this will be the UTC timestamp of when they'll be untimed-out,
-        if not timed out this will be empty.
+        If the user is currently timed out, the datetime of when the timeout ends;
+        otherwise ``False``.
     banner
-        The users banner url
+        The user's banner url, if available. A banner is not delivered over the
+        gateway, so the bare engine only sees it when the member was retrieved
+        via an explicit REST fetch - otherwise this is empty for cached members.
+        The Tags cog resolves it lazily (fetching only when a tag uses ``banner``,
+        with caching and a per-user cooldown), so there it is populated on demand.
     """
 
     def update_attributes(self) -> None:
         object: discord.Member = cast(discord.Member, self.object)
         avatar_url: str = object.display_avatar.url
         joined_at: datetime.datetime = getattr(object, "joined_at", self.object.created_at)
+        # So ``timed_out_until`` must be compared against the current time. 
+        # And Returns ``False`` when the member isn't currently timed out.
+        timed_out_until: Any = getattr(object, "timed_out_until", None)
+        is_timed_out: bool = bool(timed_out_until) and timed_out_until > discord.utils.utcnow()
+        # ``Member.banner``/``display_banner`` is now explicitly fetched.
+        banner: Any = getattr(object, "display_banner", None) or getattr(object, "banner", None)
         additional_attributes: Dict[str, Any] = {
             "color": object.color,
             "colour": object.color,
@@ -282,8 +290,8 @@ class MemberAdapter(DiscordAttributeAdapter):
             "bot": object.bot,
             "top_role": getattr(object, "top_role", ""),
             "boost": getattr(object, "premium_since", ""),
-            "timed_out": getattr(object, "timed_out_until", ""),
-            "banner": object.banner.url if object.banner else "",
+            "timed_out": timed_out_until if is_timed_out else False,
+            "banner": banner.url if banner else "",
         }
         if roleids := getattr(self.object, "_roles", None):
             additional_attributes["roleids"] = " ".join(str(r) for r in roleids)
@@ -315,7 +323,6 @@ class DMChannelAdapter(DiscordAttributeAdapter):
     jump_url
         A link to the channel.
 
-    .. versionadded:: 3.2.0
     """
 
     def update_attributes(self) -> None:
@@ -359,9 +366,6 @@ class ChannelAdapter(DiscordAttributeAdapter):
         If no category channel, this will return empty.
     jump_url
         A link to the channel.
-
-    .. versionchanged:: 3.2.0
-        Added ``jump_url`` as a parameter.
     """
 
     def update_attributes(self) -> None:
@@ -429,10 +433,6 @@ class GuildAdapter(DiscordAttributeAdapter):
         A link to the server's invite splash.
     banner
         A link to the server's banner.
-
-    .. versionchanged:: 3.2.0
-        Added ``mfa``, ``boosters``, ``boost_level``,
-        ``discovery_splash``, ``invite_splash`` & ``banner``.
     """
 
     def update_attributes(self) -> None:
@@ -509,7 +509,6 @@ class RoleAdapter(DiscordAttributeAdapter):
     position
         The role's position.
 
-    .. versionadded:: 3.2.0
     """
 
     def update_attributes(self) -> None:
@@ -546,7 +545,6 @@ class DiscordObjectAdapter(Adapter):
     timestamp
         The object's creation date as a UTC timestamp.
 
-    .. versionadded:: 3.2.0
     """
 
     __slots__: Tuple[str, ...] = ("object", "_attributes", "_methods")

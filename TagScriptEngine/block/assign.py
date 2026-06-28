@@ -55,8 +55,10 @@ class AssignmentBlock(verb_required_block(False, parameter=True)):  # type: igno
         - You can name variables with **anything** ``except`` existing block names or aliases.
         - They will ``not`` reference the value in payload, if the name is same as an existing block name or alias.
     
-    ----
-    
+    .. raw:: html
+
+        <hr>
+
     .. important:: How Argument Parsing Works - In Detail
 
     - A variable is essentially a string that can be treated as a sequence of elements (words, numbers, etc.) when accessed.
@@ -66,8 +68,10 @@ class AssignmentBlock(verb_required_block(False, parameter=True)):  # type: igno
       to extract ``specific`` parts. Let's take a look at **how** it works.
     - Parsing out of bounds index will return the whole string.
     
-    ----
-    
+    .. raw:: html
+
+        <hr>
+
     .. rubric:: **Basic Argument Parsing**
     
     Example
@@ -148,7 +152,9 @@ class AssignmentBlock(verb_required_block(False, parameter=True)):  # type: igno
         - ``-n``   → nth element from end
         - ``-n+``  → nth element from end → then forward to end (index resolved first)
     
-    -----
+    .. raw:: html
+
+        <hr>
     
     .. rubric:: **Advanced Argument Parsing**
 

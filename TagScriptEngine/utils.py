@@ -33,8 +33,6 @@ def truncate(text: str, *, max: int = 2000, var: str = "...") -> str:
     -------
     str
         The truncated content.
-
-    .. versionadded:: 3.2.0
     """
     if len(text) <= max:
         return text
