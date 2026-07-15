@@ -25,6 +25,10 @@ from .command import (
     OverrideBlock as OverrideBlock,
     SequentialGather as SequentialGather,
 )
+from .component import (
+    ComponentBlock as ComponentBlock,
+    build_components_v2_view as build_components_v2_view,
+)
 from .control import (
     AllBlock as AllBlock,
     AnyBlock as AnyBlock,
@@ -114,6 +118,8 @@ __all__: Tuple[str, ...] = (
     "BreakBlock",
     "SequentialGather",
     "CommandBlock",
+    "ComponentBlock",
+    "build_components_v2_view",
     "CooldownBlock",
     "EmbedBlock",
     "FiftyFiftyBlock",

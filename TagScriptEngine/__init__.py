@@ -32,6 +32,8 @@ from .block import (
     BreakBlock as BreakBlock,
     SequentialGather as SequentialGather,
     CommandBlock as CommandBlock,
+    ComponentBlock as ComponentBlock,
+    build_components_v2_view as build_components_v2_view,
     EmbedBlock as EmbedBlock,
     FiftyFiftyBlock as FiftyFiftyBlock,
     IfBlock as IfBlock,
@@ -76,6 +78,7 @@ from .exceptions import (
     ProcessError as ProcessError,
     EmbedParseError as EmbedParseError,
     BadColourArgument as BadColourArgument,
+    ComponentParseError as ComponentParseError,
     StopError as StopError,
     CooldownExceeded as CooldownExceeded,
 )
@@ -110,6 +113,8 @@ __all__: Tuple[str, ...] = (
     "BreakBlock",
     "SequentialGather",
     "CommandBlock",
+    "ComponentBlock",
+    "build_components_v2_view",
     "CooldownBlock",
     "EmbedBlock",
     "FiftyFiftyBlock",
@@ -163,6 +168,7 @@ __all__: Tuple[str, ...] = (
     "ProcessError",
     "EmbedParseError",
     "BadColourArgument",
+    "ComponentParseError",
     "StopError",
     "CooldownExceeded",
     "Interpreter",
@@ -181,7 +187,7 @@ __all__: Tuple[str, ...] = (
 )
 
 
-__version__: Final[str] = "3.3.2"
+__version__: Final[str] = "3.3.3"
 
 
 class VersionNamedTuple(NamedTuple):

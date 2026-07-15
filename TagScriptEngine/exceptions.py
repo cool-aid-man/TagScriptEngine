@@ -14,6 +14,7 @@ __all__: Tuple[str, ...] = (
     "ProcessError",
     "EmbedParseError",
     "BadColourArgument",
+    "ComponentParseError",
     "StopError",
     "CooldownExceeded",
 )
@@ -65,6 +66,10 @@ class BadColourArgument(EmbedParseError):
     def __init__(self, argument: str) -> None:
         self.argument: str = argument
         super().__init__(f'Colour "{argument}" is invalid.')
+
+
+class ComponentParseError(TagScriptError):
+    """Raised if an exception occurs while attempting to parse a component layout."""
 
 
 class StopError(TagScriptError):

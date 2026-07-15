@@ -44,6 +44,12 @@ Command Block
 
 .. autoclass:: TagScriptEngine.block.CommandBlock
 
+---------------
+Component Block
+---------------
+
+.. autoclass:: TagScriptEngine.block.ComponentBlock
+
 --------------
 Contains Block
 --------------

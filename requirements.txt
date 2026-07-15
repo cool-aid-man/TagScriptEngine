@@ -1,6 +1,6 @@
 autoflake
 black
-discord.py>=2.4.0
+discord.py>=2.7.1
 isort
 pyparsing
 typing_extensions
