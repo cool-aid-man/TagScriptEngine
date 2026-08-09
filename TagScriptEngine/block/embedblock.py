@@ -347,7 +347,7 @@ class EmbedBlock(Block):
         if length > 6000:
             return f"`MAX EMBED LENGTH REACHED ({length}/6000)`"
         # Skip registering empty embeds to prevent Discord API rejection.
-        # Must check non-text attributes (color, image, etc.) so sequential embed blocks 
+        # Must check non-text attributes (color, image, etc.) so sequential embed blocks
         # (e.g. `{embed(color):red}`) aren't lost before text is added.
         if not (
             length

@@ -211,7 +211,7 @@ class MemberAdapter(DiscordAttributeAdapter):
         # `or`, not a getattr default: Member.joined_at always exists but is
         # Optional, so the default never fired and None reached .timestamp().
         joined_at: datetime.datetime = getattr(object, "joined_at", None) or self.object.created_at
-        # So ``timed_out_until`` must be compared against the current time. 
+        # So ``timed_out_until`` must be compared against the current time.
         # And Returns ``False`` when the member isn't currently timed out.
         timed_out_until: Any = getattr(object, "timed_out_until", None)
         is_timed_out: bool = bool(timed_out_until) and timed_out_until > discord.utils.utcnow()
