@@ -5,9 +5,7 @@ from typing import Any, Optional, Tuple, cast
 
 import discord
 
-from ..verb import Verb
 from ..interface import SimpleAdapter
-from ..utils import escape_content
 
 try:
     import redbot  # noqa: F401
@@ -18,8 +16,8 @@ else:
 
     from redbot.core.bot import Red
     from redbot.core.commands import Command
-    from redbot.core.utils.chat_formatting import humanize_number, humanize_list
-    
+    from redbot.core.utils.chat_formatting import humanize_list, humanize_number
+
 
 __all__: Tuple[str, ...] = ("RedCommandAdapter", "RedBotAdapter")
 
@@ -52,23 +50,31 @@ class RedCommandAdapter(SimpleAdapter["Command"]):
     help
         The command's full help text (its docstring).
     aliases
-        The command's aliases, or ``None`` if it has none.
+        The command's aliases, or empty if it has none.
     signature
         The command's argument signature. Empty for commands that take no
         arguments.
+
+    .. note::
+        An attribute the object doesn't have resolves to an empty string, so a
+        missing value renders as nothing rather than leaking the raw block.
     """
+
+    __slots__: Tuple[str, ...] = ("signature",)
 
     def __init__(self, base: Command, *, signature: Optional[str] = None) -> None:
         if not _has_redbot:
-            raise ImportError(
-                "A Red-DiscordBot instance is required to use this.", name="redbot"
-            )
+            raise ImportError("A Red-DiscordBot instance is required to use this.", name="redbot")
         self.signature: Optional[str] = signature
         super().__init__(base=base)
 
+    def default_value(self) -> str:
+        return self.object.qualified_name
+
     def update_attributes(self) -> None:
         command: Command = self.object
-        # As no command sets ``description`` so the docstring goes to ``help`` (and ``short_doc`` is its first line).
+        # Docstrings populate `help` rather than `description`.
+        # Fall back to `help` so {commandinfo(description)} isn't empty.
         short_doc: str = getattr(command, "short_doc", "") or ""
         description: str = getattr(command, "description", "") or short_doc
         self._attributes.update(
@@ -78,25 +84,11 @@ class RedCommandAdapter(SimpleAdapter["Command"]):
                 "description": description,
                 "short_doc": short_doc,
                 "help": getattr(command, "help", None),
-                "aliases": humanize_list(list(getattr(command, "aliases", []))) or "None",
+                "aliases": humanize_list(list(getattr(command, "aliases", []))),
                 "qualified_name": command.qualified_name,
                 "signature": self.signature,
             }
         )
-
-    def get_value(self, ctx: Verb) -> str:
-        should_escape: bool = False
-        if ctx.parameter is None:
-            return_value: str = self.object.qualified_name
-        else:
-            try:
-                value: Any = self._attributes[ctx.parameter]
-            except KeyError:
-                return  # type: ignore
-            if isinstance(value, tuple):
-                value, should_escape = value
-            return_value: str = str(value) if value is not None else None  # type: ignore
-        return escape_content(return_value) if should_escape else return_value
 
 
 class RedBotAdapter(SimpleAdapter["Red"]):
@@ -150,8 +142,9 @@ class RedBotAdapter(SimpleAdapter["Red"]):
 
     Attributes marked ``(*)`` are owner-only and return nothing for other users.
     """
- 
-    # Bot-Owner Only attributes since these require iterating the whole guild/member cache.
+
+    # Attributes that require iterating the whole guild/member cache. They are
+    # restricted to the bot owner and resolved lazily (see ``get_value``).
     OWNER_ATTRIBUTES: Tuple[str, ...] = (
         "shard_count",
         "servers",
@@ -162,11 +155,16 @@ class RedBotAdapter(SimpleAdapter["Red"]):
         "percentage_chunked",
     )
 
+    __slots__: Tuple[str, ...] = ("is_owner", "user")
+
     def __init__(self, base: Red, *, owner: bool = True) -> None:
         if not _has_redbot:
             raise ImportError("A Red-DiscordBot instance is required to use this.")
         self.is_owner: bool = owner
         super().__init__(base=base)
+
+    def default_value(self) -> str:
+        return "{0.name}#{0.discriminator}".format(self.user)
 
     def update_attributes(self) -> None:
         self.user: discord.ClientUser = cast(discord.ClientUser, self.object.user)
@@ -186,6 +184,9 @@ class RedBotAdapter(SimpleAdapter["Red"]):
                 "verified": self.user.verified,
             }
         )
+        # Owner-only stats are intentionally NOT computed here. They require
+        # scanning every guild and member, which is wasteful when a tag only
+        # uses e.g. {bot(name)}. They are resolved lazily, once, in get_value.
 
     def _compute_owner_attribute(self, name: str) -> Any:
         bot: Red = self.object
@@ -209,24 +210,12 @@ class RedBotAdapter(SimpleAdapter["Red"]):
             return round(visible_users / total_users * 100, 2) if total_users else 0
         return None
 
-    def get_value(self, ctx: Verb) -> str:
-        should_escape: bool = False
-        if ctx.parameter is None:
-            return_value: str = "{0.name}#{0.discriminator}".format(self.user)
-        else:
-            parameter: str = ctx.parameter
-            if parameter in self.OWNER_ATTRIBUTES:
-                # Owner-only: hidden from non-owners, computed on demand (and
-                # cached in ``_attributes``) the first time an owner asks for it.
-                if not self.is_owner:
-                    return  # type: ignore
-                if parameter not in self._attributes:
-                    self._attributes[parameter] = self._compute_owner_attribute(parameter)
-            try:
-                value: Any = self._attributes[parameter]
-            except KeyError:
-                return  # type: ignore
-            if isinstance(value, tuple):
-                value, should_escape = value
-            return_value: str = str(value) if value is not None else None  # type: ignore
-        return escape_content(return_value) if should_escape else return_value
+    def resolve(self, parameter: str) -> Any:
+        if parameter in self.OWNER_ATTRIBUTES:
+            # Owner-only: hidden from non-owners, computed on demand (and cached
+            # in ``_attributes``) the first time an owner asks for it.
+            if not self.is_owner:
+                return None
+            if parameter not in self._attributes:
+                self._attributes[parameter] = self._compute_owner_attribute(parameter)
+        return super().resolve(parameter)

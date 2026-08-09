@@ -5,7 +5,6 @@ from typing import Optional, Tuple, cast
 from ..interface import verb_required_block
 from ..interpreter import Context
 
-
 __all__: Tuple[str, ...] = ("CycleBlock",)
 
 
@@ -33,7 +32,7 @@ class CycleBlock(verb_required_block(True, payload=True, parameter=True)):  # ty
     **Parameter:** index
 
     **Examples:**
-    
+
     .. code-block:: yaml
 
         {cycle(1):Cake,Candy,Chips,Cookies,Donut}

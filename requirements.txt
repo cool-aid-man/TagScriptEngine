@@ -1,6 +1,3 @@
-autoflake
-black
 discord.py>=2.7.1
-isort
 pyparsing
 typing_extensions

@@ -1,5 +1,5 @@
-from typing import Any, Dict, List
 import unittest
+from typing import Any, Dict, List
 
 import discord
 
@@ -69,7 +69,9 @@ class TestComponentBlock(unittest.TestCase):
             ("invisible", (False, False)),
             ("blank", (False, False)),
         ):
-            script = "{component(separator)}" if not keyword else "{component(separator):%s}" % keyword
+            script = (
+                "{component(separator)}" if not keyword else "{component(separator):%s}" % keyword
+            )
             item = self.layout(script)["items"][0]
             self.assertEqual((item["visible"], item["large"]), expected, keyword)
 
@@ -88,7 +90,9 @@ class TestComponentBlock(unittest.TestCase):
         )
 
     def test_images_coalesce_into_one_gallery(self):
-        layout = self.layout("{component(image):http://e.com/1.png}{component(image):http://e.com/2.png}")
+        layout = self.layout(
+            "{component(image):http://e.com/1.png}{component(image):http://e.com/2.png}"
+        )
         self.assertEqual(
             layout["items"],
             [{"type": "gallery", "urls": ["http://e.com/1.png", "http://e.com/2.png"]}],
@@ -106,7 +110,9 @@ class TestComponentBlock(unittest.TestCase):
             "{component(text):between}"
             "{component(image):http://e.com/2.png}"
         )
-        self.assertEqual([item["type"] for item in layout["items"]], ["gallery", "text", "gallery"])
+        self.assertEqual(
+            [item["type"] for item in layout["items"]], ["gallery", "text", "gallery"]
+        )
 
     # -- framing -----------------------------------------------------------
 
@@ -135,7 +141,9 @@ class TestComponentBlock(unittest.TestCase):
 
     def test_colour_hex_forms(self):
         for payload in ("#5865F2", "0x5865F2", "5865F2", "5865f2", "  #5865F2  "):
-            self.assertEqual(self.layout("{component(color):%s}" % payload)["accent_color"], 0x5865F2)
+            self.assertEqual(
+                self.layout("{component(color):%s}" % payload)["accent_color"], 0x5865F2
+            )
 
     def test_colour_named(self):
         # Parity with the embed block: any non-`from_*` discord.Colour
@@ -171,9 +179,10 @@ class TestComponentBlock(unittest.TestCase):
         self.assertFalse(response.actions["components_v2"]["framed"])
 
     def test_empty_colour_payload_is_ignored(self):
-        # `{component(color)}` with no payload is a no-op rather than an error.
+        # A no-op, but consumed: it was asserted to echo "{component(color)}",
+        # which leaked raw tagscript into the message.
         response = self.engine.process("{component(color)}")
-        self.assertEqual(response.body, "{component(color)}")
+        self.assertEqual(response.body, "")
 
     # -- limits ------------------------------------------------------------
 

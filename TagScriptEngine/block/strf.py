@@ -6,7 +6,6 @@ from typing import Optional, Tuple, cast
 from ..interface import Block
 from ..interpreter import Context
 
-
 __all__: Tuple[str, ...] = ("StrfBlock",)
 
 
@@ -42,6 +41,12 @@ class StrfBlock(Block):
 
         {unix}
         # 1629182008
+
+    .. note::
+        The timestamp must be a digit-only epoch or an ISO 8601 string. Anything
+        else - including a negative epoch (``{strf(-100):%Y}``) - is declined, so
+        the raw ``{strf(...)}`` stays in the message. A ``{strf}`` with no format
+        payload is declined too.
     """
 
     ACCEPTED_NAMES: Tuple[str, ...] = ("strf", "unix")
@@ -54,7 +59,9 @@ class StrfBlock(Block):
         if ctx.verb.parameter:
             if ctx.verb.parameter.isdigit():
                 try:
-                    t = datetime.fromtimestamp(int(ctx.verb.parameter))
+                    # tz-aware from the start: a bare fromtimestamp() returns
+                    # host-local time, which the tzinfo stamp below mislabels.
+                    t = datetime.fromtimestamp(int(ctx.verb.parameter), tz=timezone.utc)
                 except Exception:
                     return
             else:
@@ -64,7 +71,7 @@ class StrfBlock(Block):
                 except ValueError:
                     return
         else:
-            t = datetime.now()
+            t = datetime.now(timezone.utc)
         if not t.tzinfo:
             t = t.replace(tzinfo=timezone.utc)
         return t.strftime(ctx.verb.payload)

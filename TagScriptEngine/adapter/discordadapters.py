@@ -1,20 +1,13 @@
 from __future__ import annotations
 
-import logging
 import datetime
 from random import choice
-from typing import Any, Dict, Union, cast, Tuple
+from typing import Any, Dict, Optional, Tuple, Union, cast
 
 import discord
 
-from ..verb import Verb
-from ..utils import escape_content
 from .._warnings import deprecated
-from ..interface import Adapter, SimpleAdapter
-
-
-_log: logging.Logger = logging.getLogger(__name__)
-
+from ..interface import SimpleAdapter
 
 __all__: Tuple[str, ...] = (
     "AttributeAdapter",
@@ -29,65 +22,40 @@ __all__: Tuple[str, ...] = (
 )
 
 
-class AttributeAdapter(Adapter):
+def _base_defaults(base: Any) -> Dict[str, Any]:
+    """The id/created_at/timestamp/name every Discord object adapter exposes."""
+    created_at: datetime.datetime = getattr(
+        base, "created_at", None
+    ) or discord.utils.snowflake_time(base.id)
+    return {
+        "id": base.id,
+        "created_at": created_at,
+        "timestamp": int(created_at.timestamp()),
+        "name": getattr(base, "name", str(base)),
+    }
+
+
+class AttributeAdapter(SimpleAdapter[Union[discord.TextChannel, discord.Member, discord.Guild]]):
     """
     .. deprecated:: 3.2.0
         AttributeAdapter has been deprecated and will be removed in favor of
-        ``TagScriptEngine.adapter.discordadpaters.DiscordAttributeAdapter`` or
+        ``TagScriptEngine.adapter.discordadapters.DiscordAttributeAdapter`` or
         consider using ``TagScriptEngine.interface.adapter.SimpleAdapter`` instead.
     """
 
-    __slots__: Tuple[str, ...] = ("object", "_attributes", "_methods")
+    __slots__: Tuple[str, ...] = ()
 
     @deprecated(
-        name="TagScriptEngine.adapter.discordadpaters.AttributeAdapter",
+        name="TagScriptEngine.adapter.discordadapters.AttributeAdapter",
         reason=(
             "AttributeAdapter has been deprecated and will be removed in favor of "
-            "``TagScriptEngine.adapter.discordadpaters.DiscordAttributeAdapter`` or "
+            "``TagScriptEngine.adapter.discordadapters.DiscordAttributeAdapter`` or "
             "consider using ``TagScriptEngine.interface.adapter.SimpleAdapter`` instead."
         ),
         version="3.2.0",
     )
     def __init__(self, base: Union[discord.TextChannel, discord.Member, discord.Guild]) -> None:
-        self.object: Union[discord.TextChannel, discord.Member, discord.Guild] = base
-        created_at: datetime.datetime = getattr(
-            base, "created_at", None
-        ) or discord.utils.snowflake_time(base.id)
-        self._attributes: Dict[str, Any] = {
-            "id": base.id,
-            "created_at": created_at,
-            "timestamp": int(created_at.timestamp()),
-            "name": getattr(base, "name", str(base)),
-        }
-        self._methods: Dict[str, Any] = {}
-        self.update_attributes()
-        self.update_methods()
-
-    def __repr__(self) -> str:
-        return f"<{type(self).__qualname__} object={self.object!r}>"
-
-    def update_attributes(self) -> None:
-        pass
-
-    def update_methods(self) -> None:
-        pass
-
-    def get_value(self, ctx: Verb) -> str:
-        should_escape = False
-        if ctx.parameter is None:
-            return_value = str(self.object)
-        else:
-            try:
-                value = self._attributes[ctx.parameter]
-            except KeyError:
-                if method := self._methods.get(ctx.parameter):
-                    value = method()
-                else:
-                    return  # type: ignore
-            if isinstance(value, tuple):
-                value, should_escape = value
-            return_value: str = str(value) if value is not None else None  # type: ignore
-        return escape_content(return_value) if should_escape else return_value
+        super().__init__(base=base, defaults=_base_defaults(base))
 
 
 class DiscordAttributeAdapter(
@@ -103,7 +71,11 @@ class DiscordAttributeAdapter(
     ]
 ):
     """
+    Base adapter for Discord objects. Exposes ``id``, ``name``, ``created_at``
+    and ``timestamp``; subclasses add their own in :meth:`update_attributes`.
     """
+
+    __slots__: Tuple[str, ...] = ()
 
     def __init__(
         self,
@@ -116,43 +88,9 @@ class DiscordAttributeAdapter(
             discord.Role,
         ],
     ) -> None:
-        super().__init__(base=base)
-        created_at: datetime.datetime = getattr(
-            base, "created_at", None
-        ) or discord.utils.snowflake_time(base.id)
-        self._attributes.update(
-            {
-                "id": base.id,
-                "created_at": created_at,
-                "timestamp": int(created_at.timestamp()),
-                "name": getattr(base, "name", str(base)),
-            }
-        )
-
-    def __repr__(self) -> str:
-        return "<{} object={}>".format(type(self).__qualname__, self.object)
-
-    def get_value(self, ctx: Verb) -> str:  # type: ignore
-        should_escape = False
-        if ctx.parameter is None:
-            return_value = str(self.object)
-        else:
-            try:
-                value = self._attributes[ctx.parameter]
-            except KeyError:
-                if method := self._methods.get(ctx.parameter):
-                    value = method()
-                else:
-                    _log.debug(
-                        "No parameter named `{}` found for the `{}` Adapter.".format(
-                            ctx.parameter, self.__class__.__name__
-                        )
-                    )
-                    return  # type: ignore
-            if isinstance(value, tuple):
-                value, should_escape = value
-            return_value = str(value) if value is not None else None
-        return escape_content(return_value) if should_escape else return_value  # type: ignore
+        # Passed as defaults, not applied afterwards, so update_attributes() in
+        # a subclass can override them instead of being silently clobbered.
+        super().__init__(base=base, defaults=_base_defaults(base))
 
 
 class UserAdapter(DiscordAttributeAdapter):
@@ -186,26 +124,25 @@ class UserAdapter(DiscordAttributeAdapter):
     bot
         Wheather or not the user is a bot.
     accent_color
-        The user's accent color if banner is not present.
+        The user's accent color if banner is not present, otherwise empty.
+        Only delivered on a fetched user, so it is usually empty.
     avatar_decoration
-        A link to the user's avatar decoration.
+        A link to the user's avatar decoration, or empty if they have none.
 
     """
 
     def update_attributes(self) -> None:
         object: discord.User = cast(discord.User, self.object)
         avatar_url: str = object.display_avatar.url
-        if asset := object.avatar_decoration:
-            decoration: Union[str, bool] = asset.with_format("png").url
-        else:
-            decoration: Union[str, bool] = False
+        asset = getattr(object, "avatar_decoration", None)
         additional_attributes: Dict[str, Any] = {
             "nick": object.display_name,
             "mention": object.mention,
             "avatar": (avatar_url, False),
             "bot": object.bot,
-            "accent_color": getattr(object, "accent_color", False),
-            "avatar_decoration": decoration,
+            # Only populated on a fetched user, not a cached one.
+            "accent_color": getattr(object, "accent_color", None) or "",
+            "avatar_decoration": asset.with_format("png").url if asset else "",
         }
         self._attributes.update(additional_attributes)
 
@@ -259,7 +196,7 @@ class MemberAdapter(DiscordAttributeAdapter):
         if not this will be empty.
     timed_out
         If the user is currently timed out, the datetime of when the timeout ends;
-        otherwise ``False``.
+        otherwise empty.
     banner
         The user's banner url, if available. A banner is not delivered over the
         gateway, so the bare engine only sees it when the member was retrieved
@@ -271,7 +208,9 @@ class MemberAdapter(DiscordAttributeAdapter):
     def update_attributes(self) -> None:
         object: discord.Member = cast(discord.Member, self.object)
         avatar_url: str = object.display_avatar.url
-        joined_at: datetime.datetime = getattr(object, "joined_at", self.object.created_at)
+        # `or`, not a getattr default: Member.joined_at always exists but is
+        # Optional, so the default never fired and None reached .timestamp().
+        joined_at: datetime.datetime = getattr(object, "joined_at", None) or self.object.created_at
         # So ``timed_out_until`` must be compared against the current time. 
         # And Returns ``False`` when the member isn't currently timed out.
         timed_out_until: Any = getattr(object, "timed_out_until", None)
@@ -290,11 +229,12 @@ class MemberAdapter(DiscordAttributeAdapter):
             "bot": object.bot,
             "top_role": getattr(object, "top_role", ""),
             "boost": getattr(object, "premium_since", ""),
-            "timed_out": timed_out_until if is_timed_out else False,
+            "timed_out": timed_out_until if is_timed_out else "",
             "banner": banner.url if banner else "",
+            # Always present, so a member with no roles renders empty rather
+            # than leaking the raw {author(roleids)} into the message.
+            "roleids": " ".join(str(r) for r in getattr(self.object, "_roles", None) or ()),
         }
-        if roleids := getattr(self.object, "_roles", None):
-            additional_attributes["roleids"] = " ".join(str(r) for r in roleids)
         self._attributes.update(additional_attributes)
 
 
@@ -326,11 +266,7 @@ class DMChannelAdapter(DiscordAttributeAdapter):
     """
 
     def update_attributes(self) -> None:
-        if isinstance(self.object, discord.DMChannel):
-            additional_attributes: Dict[str, Any] = {
-                "jump_url": getattr(self.object, "jump_url", None)
-            }
-            self._attributes.update(additional_attributes)
+        self._attributes.update({"jump_url": getattr(self.object, "jump_url", "")})
 
 
 class ChannelAdapter(DiscordAttributeAdapter):
@@ -369,16 +305,17 @@ class ChannelAdapter(DiscordAttributeAdapter):
     """
 
     def update_attributes(self) -> None:
-        if isinstance(self.object, discord.TextChannel):
-            additional_attributes: Dict[str, Any] = {
-                "nsfw": self.object.nsfw,
-                "mention": self.object.mention,
-                "topic": self.object.topic or "",
-                "slowmode": self.object.slowmode_delay,
-                "category_id": self.object.category_id or "",
-                "jump_url": self.object.jump_url or None,
-            }
-            self._attributes.update(additional_attributes)
+        channel: Any = self.object
+        source: Any = getattr(channel, "parent", None) or channel
+        additional_attributes: Dict[str, Any] = {
+            "nsfw": getattr(source, "nsfw", False),
+            "mention": getattr(channel, "mention", ""),
+            "topic": getattr(source, "topic", "") or "",
+            "slowmode": getattr(channel, "slowmode_delay", 0),
+            "category_id": getattr(channel, "category_id", "") or "",
+            "jump_url": getattr(channel, "jump_url", ""),
+        }
+        self._attributes.update(additional_attributes)
 
 
 class GuildAdapter(DiscordAttributeAdapter):
@@ -414,7 +351,7 @@ class GuildAdapter(DiscordAttributeAdapter):
     humans
         The number of humans in the server.
     description
-        The server's description if one is set, or "No description".
+        The server's description if one is set, otherwise empty.
     random
         A random member from the server.
     vanity
@@ -428,50 +365,59 @@ class GuildAdapter(DiscordAttributeAdapter):
     boost_level
         The server's current boost level/tier.
     discovery_splash
-        A link to the server's discovery splash.
+        A link to the server's discovery splash, or empty if it has none.
     invite_splash
-        A link to the server's invite splash.
+        A link to the server's invite splash, or empty if it has none.
     banner
-        A link to the server's banner.
+        A link to the server's banner, or empty if it has none.
+
+    .. note::
+        Every attribute above is **empty** when the server does not have it -
+        never ``False`` or the raw block. Test one with ``{if({server(banner)}==):
+        no banner|{server(banner)}}``; see :class:`.AssignmentBlock` for why
+        ``==False`` is not the right check.
     """
 
     def update_attributes(self) -> None:
-        object: discord.Guild = cast(discord.Guild, self.object)
-        guild: discord.Guild = object
-        bots: int = 0
-        humans: int = 0
-        for m in guild.members:
-            if m.bot:
-                bots += 1
-            else:
-                humans += 1
+        guild: discord.Guild = cast(discord.Guild, self.object)
         member_count: int = getattr(guild, "member_count", 0)
         icon_url: str = getattr(guild.icon, "url", "")
         additional_attributes: Dict[str, Any] = {
             "icon": (icon_url, False),
             "member_count": member_count,
             "members": member_count,
-            "bots": bots,
-            "humans": humans,
-            "description": guild.description or "No description.",
-            "vanity": guild.vanity_url_code or "No Vanity URL.",
+            "description": guild.description or "",
+            "vanity": guild.vanity_url_code or "",
             "owner_id": guild.owner_id or "",
             "mfa": guild.mfa_level,
             "boosters": guild.premium_subscription_count,
             "boost_level": guild.premium_tier,
-            "discovery_splash": getattr(guild.discovery_splash, "url", False),
-            "invite_splash": getattr(guild.splash, "url", False),
-            "banner": getattr(guild.banner, "url", False),
+            "discovery_splash": getattr(guild.discovery_splash, "url", "") or "",
+            "invite_splash": getattr(guild.splash, "url", "") or "",
+            "banner": getattr(guild.banner, "url", "") or "",
         }
         self._attributes.update(additional_attributes)
 
     def update_methods(self) -> None:
-        additional_methods: Dict[str, Any] = {"random": self.random_member}
+        # bots/humans scan the whole member cache, so they are resolved on
+        # demand rather than on every tag invocation that touches {server}.
+        additional_methods: Dict[str, Any] = {
+            "random": self.random_member,
+            "bots": self.count_bots,
+            "humans": self.count_humans,
+        }
         self._methods.update(additional_methods)
 
-    def random_member(self) -> discord.Member:
+    def random_member(self) -> Optional[discord.Member]:
         object: discord.Guild = cast(discord.Guild, self.object)
-        return choice(object.members)
+        # the member cache can be empty (no members intent / not chunked yet)
+        return choice(object.members) if object.members else None
+
+    def count_bots(self) -> int:
+        return sum(1 for m in cast(discord.Guild, self.object).members if m.bot)
+
+    def count_humans(self) -> int:
+        return sum(1 for m in cast(discord.Guild, self.object).members if not m.bot)
 
 
 class RoleAdapter(DiscordAttributeAdapter):
@@ -499,7 +445,7 @@ class RoleAdapter(DiscordAttributeAdapter):
     color
         The role's color.
     display_icon
-        The role's icon.
+        A link to the role's icon, or empty if it has none.
     hoist
         Wheather the role is hoisted or not.
     managed
@@ -515,7 +461,7 @@ class RoleAdapter(DiscordAttributeAdapter):
         object: discord.Role = cast(discord.Role, self.object)
         additional_attributes: Dict[str, Any] = {
             "color": object.color,
-            "display_icon": getattr(object.display_icon, "url", False),
+            "display_icon": getattr(object.display_icon, "url", "") or "",
             "hoist": object.hoist,
             "managed": object.managed,
             "mention": object.mention,
@@ -524,9 +470,9 @@ class RoleAdapter(DiscordAttributeAdapter):
         self._attributes.update(additional_attributes)
 
 
-class DiscordObjectAdapter(Adapter):
+class DiscordObjectAdapter(SimpleAdapter[discord.Object]):
     """
-    The ``{object}`` block with no parameters returs the discord object's ID,
+    The ``{object}`` block with no parameters returns the discord object's ID,
     but passing the attributes listed below to the block payload will return
     that attribute instead.
 
@@ -547,48 +493,13 @@ class DiscordObjectAdapter(Adapter):
 
     """
 
-    __slots__: Tuple[str, ...] = ("object", "_attributes", "_methods")
+    __slots__: Tuple[str, ...] = ()
 
     def __init__(self, base: discord.Object) -> None:
-        self.object: discord.Object = base
-        created_at: datetime.datetime = getattr(
-            base, "created_at", None
-        ) or discord.utils.snowflake_time(base.id)
-        self._attributes: Dict[str, Any] = {
-            "id": base.id,
-            "created_at": created_at,
-            "timestamp": int(created_at.timestamp()),
-        }
-        self._methods: Dict[str, Any] = {}
-        self.update_attributes()
-        self.update_methods()
+        defaults = _base_defaults(base)
+        # A bare discord.Object has no name.
+        defaults.pop("name", None)
+        super().__init__(base=base, defaults=defaults)
 
-    def __repr__(self) -> str:
-        return f"<{type(self).__qualname__} object={self.object!r}>"
-
-    def update_attributes(self) -> None:
-        pass
-
-    def update_methods(self) -> None:
-        pass
-
-    def get_value(self, ctx: Verb) -> str:  # type: ignore
-        should_escape = False
-
-        if ctx.parameter is None:
-            return_value = str(self.object.id)
-        else:
-            try:
-                value = self._attributes[ctx.parameter]
-            except KeyError:
-                if method := self._methods.get(ctx.parameter):
-                    value = method()
-                else:
-                    return  # type: ignore
-
-            if isinstance(value, tuple):
-                value, should_escape = value
-
-            return_value = str(value) if value is not None else None
-
-        return escape_content(return_value) if should_escape else return_value  # type: ignore
+    def default_value(self) -> str:
+        return str(self.object.id)

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import math
 import time
-from typing import Any, Dict, List, Optional, Tuple, cast
+from collections import OrderedDict
+from typing import Any, List, Optional, Tuple, cast
 
 from discord.ext.commands import Cooldown, CooldownMapping
 
@@ -49,10 +51,14 @@ class CooldownBlock(verb_required_block(True, payload=True, parameter=True)):  #
     """
 
     ACCEPTED_NAMES: Tuple[str, ...] = ("cooldown",)
-    COOLDOWNS: Dict[Any, CooldownMapping] = {}
+    COOLDOWNS: "OrderedDict[Any, CooldownMapping]" = OrderedDict()
+    MAX_COOLDOWNS: int = 1024
 
     @classmethod
-    def create_cooldown(cls, key: Any, rate: float, per: int) -> CooldownMapping:
+    def create_cooldown(cls, key: Any, rate: int, per: float) -> CooldownMapping:
+        # Evict least-recently-used (LRU) to prevent other tags from flushing active cooldowns.
+        while len(cls.COOLDOWNS) >= cls.MAX_COOLDOWNS:
+            cls.COOLDOWNS.popitem(last=False)
         cooldown = CooldownMapping.from_cooldown(rate, per, lambda x: x)
         cls.COOLDOWNS[key] = cooldown
         return cooldown
@@ -61,10 +67,15 @@ class CooldownBlock(verb_required_block(True, payload=True, parameter=True)):  #
         verb = ctx.verb
         try:
             rate, per = cast(List[str], helper_split(cast(str, verb.parameter), maxsplit=1))
-            per = int(per)
-            rate = float(rate)
+            rate = int(rate)
+            per = float(per)
         except (ValueError, TypeError):
-            return
+            # fail closed: a malformed parameter must not silently disable the cooldown
+            return "[cooldown error: invalid parameter, expected cooldown(rate|per)]"
+        # nan/inf survive float(), and a nan window makes every rate-limit
+        # comparison false - i.e. a cooldown that never triggers.
+        if rate < 1 or not math.isfinite(per) or per <= 0:
+            return "[cooldown error: rate must be >= 1 and per must be a positive number]"
 
         if split := helper_split(cast(str, verb.payload), False, maxsplit=1):
             key, message = split
@@ -77,6 +88,7 @@ class CooldownBlock(verb_required_block(True, payload=True, parameter=True)):  #
             cooldown_key = ctx.original_message
         try:
             cooldown = self.COOLDOWNS[cooldown_key]
+            self.COOLDOWNS.move_to_end(cooldown_key)  # mark as recently used
             base = cast(Cooldown, cooldown._cooldown)
             if (rate, per) != (base.rate, base.per):
                 cooldown = self.create_cooldown(cooldown_key, rate, per)

@@ -6,15 +6,23 @@ from typing import Optional, Tuple, cast
 from ..interface import verb_required_block
 from ..interpreter import Context
 
-
 __all__: Tuple[str, ...] = ("RandomBlock",)
 
 
 class RandomBlock(verb_required_block(True, payload=True)):  # type: ignore
     """
     Pick a random item from a list of strings, split by either ``~``
-    or ``,``. An optional seed can be provided to the parameter to
-    always choose the same item when using that seed.
+    or ``,``.
+
+    **Seed:** the parameter is an optional *seed* - any text. Without a
+    seed, a fresh random pick is made on every invocation. With a seed,
+    the pick is **deterministic**: the same seed with the same list
+    always returns the same item, every time, even across restarts.
+    ``{random(5):a,b,c}`` will return the same letter forever - that is
+    by design, not a bug. Use a *variable* seed to get results that are
+    stable per-context but different across contexts, e.g.
+    ``{random({user(id)}):a,b,c}`` gives each user their own fixed pick.
+    Seeded picks never affect other random blocks in the tag.
 
     **Usage:** ``{random([seed]):<list>}``
 
@@ -46,6 +54,7 @@ class RandomBlock(verb_required_block(True, payload=True)):  # type: ignore
             spl = payload.split("~")
         else:
             spl = payload.split(",")
-        random.seed(ctx.verb.parameter)
+        # use a local RNG when seeded so the process-wide RNG is never reseeded
+        rng = random.Random(ctx.verb.parameter) if ctx.verb.parameter is not None else random
 
-        return random.choice(spl)
+        return rng.choice(spl)

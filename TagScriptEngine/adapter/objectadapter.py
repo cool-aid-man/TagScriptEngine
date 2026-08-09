@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from typing import Tuple
 from inspect import ismethod
+from typing import Tuple
 
 from ..interface import Adapter
 from ..verb import Verb
-
 
 __all__: Tuple[str, ...] = ("SafeObjectAdapter",)
 

@@ -1,29 +1,11 @@
 from __future__ import annotations
 
-from typing import Optional, Protocol, Tuple
+from typing import Optional, Tuple
 
 __all__: Tuple[str, ...] = ("Verb",)
 
 
-class _Verb(Protocol):
-    def __init__(
-        self, verb_string: Optional[str] = None, *, limit: int = 2000, dot_parameter: bool = False
-    ) -> None: ...
-
-    def __parse(self, verb_string: str, limit: int) -> None: ...
-
-    def _parse_paranthesis_parameter(self, i: int, v: str) -> bool: ...
-
-    def _parse_dot_parameter(self, i: int, v: str) -> bool: ...
-
-    def set_payload(self) -> None: ...
-
-    def open_parameter(self, i: int) -> None: ...
-
-    def close_parameter(self, i: int) -> bool: ...
-
-
-class Verb(_Verb):
+class Verb:
     """
     Represents the passed TagScript block.
 
@@ -74,6 +56,13 @@ class Verb(_Verb):
         self.parameter: Optional[str] = None
         self.payload: Optional[str] = None
         self.dot_parameter = dot_parameter
+        # Initialised here too so a blank Verb() is safe to touch; __parse
+        # overwrites them when there is something to parse.
+        self.parsed_string: str = ""
+        self.parsed_length: int = 0
+        self.dec_depth: int = 0
+        self.dec_start: Optional[int] = None
+        self.skip_next: bool = False
         if verb_string is None:
             return
         self.__parse(verb_string, limit)
@@ -98,7 +87,7 @@ class Verb(_Verb):
         self.parsed_string = verb_string[1:-1][:limit]
         self.parsed_length = len(self.parsed_string)
         self.dec_depth = 0
-        self.dec_start = 0
+        self.dec_start: Optional[int] = None
         self.skip_next = False
 
         parse_parameter = (
@@ -129,9 +118,14 @@ class Verb(_Verb):
         return False
 
     def _parse_dot_parameter(self, i: int, v: str) -> bool:
-        if v == ".":
+        # Only the first dot opens: treating every dot as a new level means
+        # `{user.name.thing}` never closes and the parameter is lost.
+        if v == "." and not self.dec_depth:
             self.open_parameter(i)
-        elif (v == ":" or i == self.parsed_length - 1) and self.dec_depth:
+        elif v == ":" and self.dec_depth:
+            # the colon both closes the parameter and starts the payload
+            return self.close_parameter(i, at_colon=True)
+        elif i == self.parsed_length - 1 and self.dec_depth:
             return self.close_parameter(i + 1)
         return False
 
@@ -143,18 +137,21 @@ class Verb(_Verb):
 
     def open_parameter(self, i: int) -> None:
         self.dec_depth += 1
-        if not self.dec_start:
+        if self.dec_start is None:
             self.dec_start = i
             self.declaration = self.parsed_string[:i]
 
-    def close_parameter(self, i: int) -> bool:
+    def close_parameter(self, i: int, at_colon: bool = False) -> bool:
         self.dec_depth -= 1
         if self.dec_depth == 0:
             self.parameter = self.parsed_string[self.dec_start + 1 : i]
-            try:
-                if self.parsed_string[i + 1] == ":":
-                    self.payload = self.parsed_string[i + 2 :]
-            except IndexError:
-                pass
+            if at_colon:
+                self.payload = self.parsed_string[i + 1 :]
+            else:
+                try:
+                    if self.parsed_string[i + 1] == ":":
+                        self.payload = self.parsed_string[i + 2 :]
+                except IndexError:
+                    pass
             return True
         return False

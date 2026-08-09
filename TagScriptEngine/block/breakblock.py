@@ -6,7 +6,6 @@ from ..interface import Block
 from ..interpreter import Context
 from . import helper_parse_if
 
-
 __all__: Tuple[str, ...] = ("BreakBlock",)
 
 
@@ -36,6 +35,8 @@ class BreakBlock(Block):
     ACCEPTED_NAMES: Tuple[str, ...] = ("break", "shortcircuit", "short")
 
     def process(self, ctx: Context) -> Optional[str]:
+        if ctx.verb.parameter is None:
+            return ""
         if helper_parse_if(cast(str, ctx.verb.parameter)):
             ctx.response.body = ctx.verb.payload if ctx.verb.payload != None else ""  # noqa: E711
         return ""

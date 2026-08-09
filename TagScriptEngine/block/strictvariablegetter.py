@@ -5,7 +5,6 @@ from typing import Optional, Tuple, cast
 from ..interface import Block
 from ..interpreter import Context
 
-
 __all__: Tuple[str, ...] = ("StrictVariableGetterBlock",)
 
 
@@ -35,4 +34,9 @@ class StrictVariableGetterBlock(Block):
         return ctx.verb.declaration in ctx.response.variables
 
     def process(self, ctx: Context) -> Optional[str]:
-        return ctx.response.variables[cast(str, ctx.verb.declaration)].get_value(ctx.verb)
+        # Re-check variable as ShortCutRedirectBlock may rewrite verbs post-approval (e.g., `{1}` -> `{args}`).
+        # Returning None safely leaves the raw block if the target variable is undefined.
+        adapter = ctx.response.variables.get(cast(str, ctx.verb.declaration))
+        if adapter is None:
+            return None
+        return adapter.get_value(ctx.verb)

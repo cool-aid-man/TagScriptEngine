@@ -6,7 +6,6 @@ from ..interface import Adapter
 from ..utils import escape_content
 from ..verb import Verb
 
-
 __all__: Tuple[str, ...] = ("StringAdapter",)
 
 

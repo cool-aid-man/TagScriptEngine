@@ -2,25 +2,30 @@
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[tool.black]
+[tool.ruff]
 line-length = 99
+target-version = "py39"
+exclude = ["build", "dist", "docs", "venv", "playground.py"]
 
-[tool.isort]
-profile = "black"
-line_length = 99
+[tool.ruff.lint]
+# E/W pycodestyle, F pyflakes, I isort, B bugbear.
+select = ["E", "W", "F", "I", "B"]
+ignore = [
+    "E501",  # line length is enforced by the formatter
+    "B008",  # function call in default arg - intentional in the block factories
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]  # re-exports
 
 [tool.pyright]
-include = [
-    "TagScriptEngine",
-    "TagScriptEngine/adapter",
-    "TagScriptEngine/block",
-    "TagScriptEngine/interface",
-]
+include = ["TagScriptEngine"]
 exclude = [
     "**/__pycache__",
     "build",
     "dist",
     "docs",
+    "venv",
 ]
 pythonVersion = "3.9"
 typeCheckingMode = "basic"

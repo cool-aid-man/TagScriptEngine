@@ -5,7 +5,6 @@ from typing import Optional, Tuple, cast
 from ..interface import verb_required_block
 from ..interpreter import Context
 
-
 __all__: Tuple[str, ...] = ("RedirectBlock",)
 
 
@@ -28,7 +27,7 @@ class RedirectBlock(verb_required_block(True, parameter=True)):  # type: ignore
         {redirect(626861902521434160)}
     """
 
-    ACCEPTED_NAMES = ("redirect",)
+    ACCEPTED_NAMES: Tuple[str, ...] = ("redirect",)
 
     def process(self, ctx: Context) -> Optional[str]:
         param: str = cast(str, ctx.verb.parameter).strip()

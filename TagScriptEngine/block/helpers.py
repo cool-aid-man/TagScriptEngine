@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from typing import Dict, List, Optional, Tuple
 
-
 __all__: Tuple[str, ...] = (
     "implicit_bool",
     "helper_parse_if",
@@ -88,22 +87,22 @@ def helper_parse_if(string: str) -> Optional[bool]:
         return value
     try:
         if "!=" in string:
-            spl = string.split("!=")
+            spl = string.split("!=", 1)
             return spl[0].strip() != spl[1].strip()
         if "==" in string:
-            spl = string.split("==")
+            spl = string.split("==", 1)
             return spl[0].strip() == spl[1].strip()
         if ">=" in string:
-            spl = string.split(">=")
+            spl = string.split(">=", 1)
             return float(spl[0].strip()) >= float(spl[1].strip())
         if "<=" in string:
-            spl = string.split("<=")
+            spl = string.split("<=", 1)
             return float(spl[0].strip()) <= float(spl[1].strip())
         if ">" in string:
-            spl = string.split(">")
+            spl = string.split(">", 1)
             return float(spl[0].strip()) > float(spl[1].strip())
         if "<" in string:
-            spl = string.split("<")
+            spl = string.split("<", 1)
             return float(spl[0].strip()) < float(spl[1].strip())
     except Exception:
         pass

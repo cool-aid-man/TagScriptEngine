@@ -1,8 +1,9 @@
-from __future__ import division, annotations
+from __future__ import annotations, division
 
 import math
 import operator
-from typing import Any, Callable, Dict, List, Tuple, cast, Optional as TypingOptional
+from typing import Any, Callable, Dict, Final, List, Tuple, cast
+from typing import Optional as TypingOptional
 
 from pyparsing import (
     CaselessLiteral,
@@ -22,8 +23,32 @@ from pyparsing import (
 from ..interface import Block
 from ..interpreter import Context
 
-
 __all__: Tuple[str, ...] = ("MathBlock",)
+
+
+# Floats raise OverflowError themselves, but `int ** int` is arbitrary
+# precision - it never overflows, it just keeps computing. round/trunc/abs all
+# return ints, so `{math:round(9)^round(9)^round(9)}` is 9**387420489 and hangs
+# the event loop. Must be checked before the operation, not caught after.
+MAX_EXPONENT: Final[int] = 1000
+MAX_RESULT_DIGITS: Final[int] = 1000
+
+
+class _MathLimitError(Exception):
+    """Raised when an expression would produce an unreasonably large result."""
+
+
+def _guarded_pow(base: Any, exponent: Any) -> Any:
+    """``operator.pow`` with a ceiling on the result size."""
+    try:
+        if abs(exponent) > MAX_EXPONENT:
+            raise _MathLimitError(f"exponent {exponent} exceeds the maximum of {MAX_EXPONENT}")
+        # log10 estimates the digit count without computing the value.
+        if base and abs(exponent) * math.log10(abs(base)) > MAX_RESULT_DIGITS:
+            raise _MathLimitError(f"the result would exceed {MAX_RESULT_DIGITS} digits")
+    except (TypeError, ValueError) as error:
+        raise _MathLimitError(str(error)) from error
+    return operator.pow(base, exponent)
 
 
 class NumericStringParser(object):
@@ -87,7 +112,9 @@ class NumericStringParser(object):
         # that is, 2^3^2 = 2^(3^2), not (2^3)^2.
         factor: Forward = Forward()
         factor << atom + ZeroOrMore((expop + factor).set_parse_action(self.pushFirst))  # type: ignore
-        term: ParserElement = factor + ZeroOrMore((multop + factor).set_parse_action(self.pushFirst))
+        term: ParserElement = factor + ZeroOrMore(
+            (multop + factor).set_parse_action(self.pushFirst)
+        )
         expr << term + ZeroOrMore((addop + term).set_parse_action(self.pushFirst))  # type: ignore
         final: ParserElement = expr + ZeroOrMore((iop + expr).set_parse_action(self.pushFirst))
         # addop_term = ( addop + term ).set_parse_action( self.pushFirst )
@@ -105,7 +132,7 @@ class NumericStringParser(object):
             "*=": operator.imul,
             "/": operator.truediv,
             "/=": operator.itruediv,
-            "^": operator.pow,
+            "^": _guarded_pow,
             "%": operator.mod,
         }
         self.fn: Dict[str, Any] = {
@@ -218,12 +245,28 @@ class MathBlock(Block):
 
         {m:sqrt(144)}
         # 12.0
+
+    .. note::
+        An expression with no real, finite result - ``1/0``, ``5%0``, ``sqrt(-1)``,
+        ``(0-2)^0.5`` - is declined, so the raw ``{math:...}`` stays in the message.
+        A bare ``{math}`` is declined too, which is what lets a variable named
+        ``math`` be read.
     """
 
     ACCEPTED_NAMES: Tuple[str, ...] = ("math", "m", "+", "calc")
 
     def process(self, ctx: Context) -> TypingOptional[str]:
         try:
-            return str(NSP.eval(cast(str, ctx.verb.payload).strip(" ")))
+            result = NSP.eval(cast(str, ctx.verb.payload).strip(" "))
+        except _MathLimitError as error:
+            # Report this one - a raw `{math:...}` gives no hint it was refused.
+            return f"`MATH LIMIT EXCEEDED ({error})`"
         except Exception:
             return None
+        # Handle ints first without `isfinite()`, as float coercion raises OverflowError on large ints.
+        if isinstance(result, int):
+            return str(result)
+        # Decline complex numbers (non-real results) to prevent leaking Python repr into output.
+        if not isinstance(result, float) or not math.isfinite(result):
+            return None
+        return str(result)

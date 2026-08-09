@@ -116,7 +116,6 @@ class TestEdgeCases(unittest.TestCase):
 """
         data = {"target": adapter.StringAdapter("Basic Username")}
         result = self.engine.process(script, data).body  # type: ignore
-        print(result)
         self.assertTrue(len(result) < 150)  # type: ignore
 
     def test_recursion(self):

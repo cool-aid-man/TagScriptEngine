@@ -7,7 +7,6 @@ from ..interface import verb_required_block
 from ..interpreter import Context
 from . import helper_parse_if
 
-
 __all__: Tuple[str, ...] = ("StopBlock",)
 
 

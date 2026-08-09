@@ -6,7 +6,6 @@ from ..adapter import StringAdapter
 from ..interface import verb_required_block
 from ..interpreter import Context
 
-
 __all__: Tuple[str, ...] = ("AssignmentBlock",)
 
 
@@ -30,7 +29,7 @@ class AssignmentBlock(verb_required_block(False, parameter=True)):  # type: igno
     **Parameter:** name
 
     **Examples:**
-    
+
     .. code-block:: yaml
 
         {=(message1):Hi there! How are you?}
@@ -41,7 +40,7 @@ class AssignmentBlock(verb_required_block(False, parameter=True)):  # type: igno
         {message1} # Hi there! How are you?
         {message2} # It's a beautiful day today!
         {message3} # Did you know that TagScript is a powerful tool?
-        
+
         More example:
         {=(prefix):!}
         The prefix here is `{prefix}`.
@@ -52,9 +51,21 @@ class AssignmentBlock(verb_required_block(False, parameter=True)):  # type: igno
         # The day is Monday.
 
     .. caution::
-        - You can name variables with **anything** ``except`` existing block names or aliases.
-        - They will ``not`` reference the value in payload, if the name is same as an existing block name or alias.
-    
+        **Don't name a variable after a block.** It looks like it works, but from
+        then on that name sometimes gives you your text and sometimes runs the
+        block - and you can't tell which by looking::
+
+            {=(delete):Hi} {delete}     # Hi   - your text. The message is NOT
+                                        #        deleted, the block never ran.
+            {=(math):zzz} {math}        # zzz  - your text
+            {=(math):zzz} {math:1+1}    # 2.0  - the block ran, not your text
+
+        A few names can be set but **never** read back - you always get the
+        block: ``50``, ``5050``, ``break``, ``short``, ``shortcircuit``, ``unix``.
+
+        Pick a name no block uses - ``{=(may_delete):...}``, ``{=(total):...}`` -
+        and none of this applies.
+
     .. raw:: html
 
         <hr>
@@ -67,13 +78,13 @@ class AssignmentBlock(verb_required_block(False, parameter=True)):  # type: igno
     - Once a variable is assigned, its value can be referenced and ``parsed`` (split and indexed)
       to extract ``specific`` parts. Let's take a look at **how** it works.
     - Parsing out of bounds index will return the whole string.
-    
+
     .. raw:: html
 
         <hr>
 
     .. rubric:: **Basic Argument Parsing**
-    
+
     Example
         - "Coolaid is setting up the table. So, he grabbed - a cordless drill, some screws, a spirit level, and a pair of work gloves"
 
@@ -103,7 +114,7 @@ class AssignmentBlock(verb_required_block(False, parameter=True)):  # type: igno
     .. code-block:: yaml
 
         {args(0)}  -> gloves
-    
+
     - Negative indices allow you to access elements from the end of the sequence:
 
     .. code-block:: yaml
@@ -116,7 +127,7 @@ class AssignmentBlock(verb_required_block(False, parameter=True)):  # type: igno
         {args(-6)}  -> level,
 
     .. rubric:: Prefix Range Access (``+n``)
-    
+
     - Prefixing an index with ``+`` returns all elements from the start up to and including that position:
 
     .. code-block:: yaml
@@ -151,11 +162,11 @@ class AssignmentBlock(verb_required_block(False, parameter=True)):  # type: igno
         - ``n+``   → from n → end (index resolved first)
         - ``-n``   → nth element from end
         - ``-n+``  → nth element from end → then forward to end (index resolved first)
-    
+
     .. raw:: html
 
         <hr>
-    
+
     .. rubric:: **Advanced Argument Parsing**
 
     A **custom delimiter** can be passed as the payload to change how
@@ -182,30 +193,30 @@ class AssignmentBlock(verb_required_block(False, parameter=True)):  # type: igno
           Because the index ``3rd`` element is out of bounds.
 
     .. rubric:: **Nested Variables**
-    
+
     - Variables can be **nested** to perform multi-level parsing:
 
     .. code-block:: yaml
 
         {=(raw):A - B, C, D}
-        {=(part):{raw(2):-}} 
-        
+        {=(part):{raw(2):-}}
+
         # "{raw(2):-}" splits "raw" by "-" and returns the 2nd element -> "B, C, D" (1st element is "A")
         # Therefore, "part" == "B, C, D"
-        
+
         {part(1):,}  -> B
         {part(2):,}  -> C
 
         Another Example:
         # What if you want to parse through the things that Coolaid grabbed?
         # If you look closely the "-" delimiter is placed conveniently to separate the items. So, we'll use it:
-    
+
         {=(args):Coolaid is setting up the table. So, he grabbed - a cordless drill, some screws, a spirit level, and a pair of work gloves}
         {=(items):{args(2):-}}
-        
+
         # "{args(2):-}" splits "args" by "-" and returns the 2nd element -> "a cordless drill, ... and a pair of work gloves"
         # Therefore, "items" == "a cordless drill, some screws, a spirit level, and a pair of work gloves"
-        
+
         Items:
         {items(1):,}  -> a cordless drill
         {items(2):,}  -> some screws
@@ -219,5 +230,6 @@ class AssignmentBlock(verb_required_block(False, parameter=True)):  # type: igno
     def process(self, ctx: Context) -> Optional[str]:
         if ctx.verb.parameter is None:
             return None
-        ctx.response.variables[ctx.verb.parameter] = StringAdapter(str(ctx.verb.payload))
+        payload = ctx.verb.payload if ctx.verb.payload is not None else ""
+        ctx.response.variables[ctx.verb.parameter] = StringAdapter(payload)
         return ""

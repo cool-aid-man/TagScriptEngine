@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import builtins
 import re
 from inspect import isawaitable
-from typing import Any, Awaitable, Callable, Tuple, TypeVar, Union
-
+from typing import Any, Awaitable, Callable, Optional, Tuple, TypeVar, Union
 
 __all__: Tuple[str, ...] = ("truncate", "escape_content", "maybe_await")
 
@@ -36,21 +36,22 @@ def truncate(text: str, *, max: int = 2000, var: str = "...") -> str:
     """
     if len(text) <= max:
         return text
-    truncated: str = text[: max - 3]
+    # Reserve room for `var` itself; hardcoding 3 only suits the default "...".
+    truncated: str = text[: builtins.max(0, max - len(var))]
     return truncated + var
 
 
-def escape_content(string: str) -> str:
+def escape_content(string: Optional[str]) -> Optional[str]:
     """
     Escapes given input to avoid tampering with engine/block behavior.
 
     Returns
     -------
-    str
-        The escaped content.
+    Optional[str]
+        The escaped content, or ``None`` if ``None`` was passed.
     """
     if string is None:
-        return
+        return None
     return pattern.sub(_sub_match, string)
 
 

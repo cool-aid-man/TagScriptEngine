@@ -5,14 +5,14 @@ from typing import Optional, Tuple, cast
 from ..interface import verb_required_block
 from ..interpreter import Context
 
-
 __all__: Tuple[str, ...] = ("CountBlock", "LengthBlock")
 
 
 class CountBlock(verb_required_block(True, payload=True)):  # type: ignore
     """
     The count block counts occurrences of a substring within a message.
-    The search is case sensitive and includes overlapping substrings.
+    The search is case sensitive and counts **non-overlapping** matches, so
+    ``{count(aa):aaaa}`` returns ``2``, not ``3``.
 
     A payload (the message to search in) is **required**. Optionally,
     pass the text to search for as a parameter. If no parameter is
@@ -75,4 +75,6 @@ class LengthBlock(verb_required_block(True, parameter=True)):  # type: ignore
     ACCEPTED_NAMES: Tuple[str, ...] = ("length", "len")
 
     def process(self, ctx: Context) -> Optional[str]:
-        return str(len(ctx.verb.parameter)) if ctx.verb.parameter else "-1"
+        # verb_required_block(True, parameter=True) guarantees a truthy
+        # parameter, so there is no "-1" case to fall back to.
+        return str(len(cast(str, ctx.verb.parameter)))

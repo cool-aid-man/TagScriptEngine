@@ -5,7 +5,6 @@ from typing import Optional, Tuple
 from ..interface import Block
 from ..interpreter import Context
 
-
 __all__: Tuple[str, ...] = ("LooseVariableGetterBlock",)
 
 

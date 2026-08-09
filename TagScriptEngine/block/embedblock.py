@@ -6,11 +6,11 @@ from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 from discord import Colour, Embed
 
+from ..exceptions import BadColourArgument, EmbedParseError
 from ..interface import Block
 from ..interpreter import Context
-from .helpers import helper_split, implicit_bool
 from ..utils import truncate
-from ..exceptions import BadColourArgument, EmbedParseError
+from .helpers import helper_split, implicit_bool
 
 try:
     import orjson  # noqa: F401
@@ -32,7 +32,9 @@ else:
 def string_to_color(argument: str) -> Colour:
     arg = argument.replace("0x", "").lower()
 
-    if arg[0] == "#":
+    # startswith, not arg[0]: an empty arg (e.g. a payload of "0x") indexed out
+    # of range and only got caught by an unrelated handler upstream.
+    if arg.startswith("#"):
         arg = arg[1:]
     try:
         value = int(arg, base=16)
@@ -43,7 +45,9 @@ def string_to_color(argument: str) -> Colour:
         arg = arg.replace(" ", "_")
         method = getattr(Colour, arg, None)
         if arg.startswith("from_") or method is None or not ismethod(method):
-            raise BadColourArgument(arg)
+            # `from None`: the ValueError just means "not hex, try a name" and
+            # is noise in the traceback.
+            raise BadColourArgument(arg) from None
         return method()
 
 
@@ -67,7 +71,7 @@ def add_field(embed: Embed, _: str, payload: str) -> None:
         inline = implicit_bool(_inline)
         if inline is None:
             raise EmbedParseError(
-                "`inline` argument for `add_field` is not a boolean value (_inline)"
+                f"`inline` argument for `add_field` is not a boolean value ({_inline})"
             )
     except ValueError:
         name, value = cast(
@@ -139,8 +143,8 @@ class EmbedBlock(Block):
 
     **Parameter:** json
 
-    **Examples:** 
-    
+    **Examples:**
+
     .. code-block:: yaml
 
         Example 1:
@@ -255,10 +259,17 @@ class EmbedBlock(Block):
         except (json.decoder.JSONDecodeError, ValueError) as error:
             raise EmbedParseError(error) from error
 
+        if not isinstance(data, dict):
+            raise EmbedParseError("The embed JSON must be an object.")
         if data.get("embed"):
             data = data["embed"]
-        if data.get("timestamp"):
-            data["timestamp"] = data["timestamp"].strip("Z")
+            if not isinstance(data, dict):
+                raise EmbedParseError('The "embed" key must be an object.')
+        if timestamp := data.get("timestamp"):
+            if not isinstance(timestamp, str):
+                raise EmbedParseError('The "timestamp" key must be a string.')
+            # removesuffix, not strip: strip("Z") also eats a leading Z.
+            data["timestamp"] = timestamp.removesuffix("Z")
 
         color = data.pop("color", data.pop("colour", None))
 
@@ -291,17 +302,37 @@ class EmbedBlock(Block):
             embed.title = truncate(embed.title, max=FIELD_LIMITS["title"])
         if embed.description and len(embed.description) > FIELD_LIMITS["description"]:
             embed.description = truncate(embed.description, max=FIELD_LIMITS["description"])
-        if embed.footer and embed.footer.text and len(embed.footer.text) > FIELD_LIMITS["footer.text"]:
-            embed.set_footer(text=truncate(embed.footer.text, max=FIELD_LIMITS["footer.text"]), icon_url=embed.footer.icon_url)
-        if embed.author and embed.author.name and len(embed.author.name) > FIELD_LIMITS["author.name"]:
-            embed.set_author(name=truncate(embed.author.name, max=FIELD_LIMITS["author.name"]), url=embed.author.url, icon_url=embed.author.icon_url)
-        for field in embed.fields:
-            if field.name and len(field.name) > FIELD_LIMITS["field.name"]:
-                idx = embed.fields.index(field)
-                embed.set_field_at(idx, name=truncate(field.name, max=FIELD_LIMITS["field.name"]), value=field.value, inline=field.inline)
-            if field.value and len(field.value) > FIELD_LIMITS["field.value"]:
-                idx = embed.fields.index(field)
-                embed.set_field_at(idx, name=field.name, value=truncate(field.value, max=FIELD_LIMITS["field.value"]), inline=field.inline)
+        if (
+            embed.footer
+            and embed.footer.text
+            and len(embed.footer.text) > FIELD_LIMITS["footer.text"]
+        ):
+            embed.set_footer(
+                text=truncate(embed.footer.text, max=FIELD_LIMITS["footer.text"]),
+                icon_url=embed.footer.icon_url,
+            )
+        if (
+            embed.author
+            and embed.author.name
+            and len(embed.author.name) > FIELD_LIMITS["author.name"]
+        ):
+            embed.set_author(
+                name=truncate(embed.author.name, max=FIELD_LIMITS["author.name"]),
+                url=embed.author.url,
+                icon_url=embed.author.icon_url,
+            )
+        # Update fields once by index: `set_field_at` replaces the field, invalidating subsequent index lookups.
+        for idx, field in enumerate(embed.fields):
+            name, value = field.name, field.value
+            over_name = bool(name) and len(name) > FIELD_LIMITS["field.name"]
+            over_value = bool(value) and len(value) > FIELD_LIMITS["field.value"]
+            if not (over_name or over_value):
+                continue
+            if over_name:
+                name = truncate(name, max=FIELD_LIMITS["field.name"])
+            if over_value:
+                value = truncate(value, max=FIELD_LIMITS["field.value"])
+            embed.set_field_at(idx, name=name, value=value, inline=field.inline)
 
     @staticmethod
     def return_error(error: Exception) -> str:
@@ -315,6 +346,18 @@ class EmbedBlock(Block):
             return str(error)
         if length > 6000:
             return f"`MAX EMBED LENGTH REACHED ({length}/6000)`"
+        # Skip registering empty embeds to prevent Discord API rejection.
+        # Must check non-text attributes (color, image, etc.) so sequential embed blocks 
+        # (e.g. `{embed(color):red}`) aren't lost before text is added.
+        if not (
+            length
+            or embed.colour
+            or embed.url
+            or embed.timestamp
+            or embed.image
+            or embed.thumbnail
+        ):
+            return ""
         ctx.response.actions["embed"] = embed
         return ""
 
@@ -330,7 +373,9 @@ class EmbedBlock(Block):
                 embed = self.get_embed(ctx)
                 embed = self.update_embed(embed, lowered, ctx.verb.payload)
             else:
-                return
+                # Unknown attribute, or a known one with no value. Consume it -
+                # None would echo the raw block into the message.
+                return ""
         except EmbedParseError as error:
             return self.return_error(error)
 

@@ -4,14 +4,30 @@ from typing import Tuple
 
 from .discordadapters import (
     AttributeAdapter as AttributeAdapter,
-    DiscordAttributeAdapter as DiscordAttributeAdapter,
-    UserAdapter as UserAdapter,
-    MemberAdapter as MemberAdapter,
-    DMChannelAdapter as DMChannelAdapter,
+)
+from .discordadapters import (
     ChannelAdapter as ChannelAdapter,
-    GuildAdapter as GuildAdapter,
-    RoleAdapter as RoleAdapter,
+)
+from .discordadapters import (
+    DiscordAttributeAdapter as DiscordAttributeAdapter,
+)
+from .discordadapters import (
     DiscordObjectAdapter as DiscordObjectAdapter,
+)
+from .discordadapters import (
+    DMChannelAdapter as DMChannelAdapter,
+)
+from .discordadapters import (
+    GuildAdapter as GuildAdapter,
+)
+from .discordadapters import (
+    MemberAdapter as MemberAdapter,
+)
+from .discordadapters import (
+    RoleAdapter as RoleAdapter,
+)
+from .discordadapters import (
+    UserAdapter as UserAdapter,
 )
 from .functionadapter import (
     FunctionAdapter as FunctionAdapter,
@@ -23,13 +39,14 @@ from .objectadapter import (
     SafeObjectAdapter as SafeObjectAdapter,
 )
 from .redbotadapters import (
-    RedCommandAdapter as RedCommandAdapter,
     RedBotAdapter as RedBotAdapter,
+)
+from .redbotadapters import (
+    RedCommandAdapter as RedCommandAdapter,
 )
 from .stringadapter import (
     StringAdapter as StringAdapter,
 )
-
 
 __all__: Tuple[str, ...] = (
     "SafeObjectAdapter",

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, Optional, Protocol, Tuple, Type, cast
+from typing import TYPE_CHECKING, Any, Optional, Tuple, Type, cast
 
 if TYPE_CHECKING:
     from ..interpreter import Context
@@ -10,22 +10,7 @@ if TYPE_CHECKING:
 __all__: Tuple[str, ...] = ("Block", "verb_required_block")
 
 
-class _Block(Protocol):
-    ACCEPTED_NAMES: Tuple[str, ...]
-
-    def __repr__(self) -> str: ...
-
-    @classmethod
-    def will_accept(cls, ctx: Context) -> bool: ...
-
-    def pre_process(self, ctx: Context) -> Any: ...
-
-    def process(self, ctx: Context) -> Optional[str]: ...
-
-    def post_process(self, ctx: "Context") -> Any: ...
-
-
-class Block(_Block):
+class Block:
     """
     The base class for TagScript blocks.
 
@@ -111,7 +96,7 @@ def verb_required_block(
         Passing True will cause the block to require the payload to be passed.
     """
     check = (lambda x: x) if implicit else (lambda x: x is not None)
-    
+
     class VerbRequiredBlock(Block):
         @classmethod
         def will_accept(cls, ctx: Context) -> bool:
@@ -121,4 +106,5 @@ def verb_required_block(
             if parameter and not check(verb.parameter):
                 return False
             return super().will_accept(ctx)
+
     return VerbRequiredBlock

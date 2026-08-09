@@ -5,7 +5,6 @@ from typing import Callable, Tuple
 from ..interface import Adapter
 from ..verb import Verb
 
-
 __all__: Tuple[str, ...] = ("FunctionAdapter",)
 
 

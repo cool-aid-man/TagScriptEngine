@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.abspath(".."))
 # -- Project information -----------------------------------------------------
 
 project = "AdvancedTagScript"
-copyright = "2021, JonSnowbd, PhenoM4n4n, inthedark.org, cool-aid-man"
+copyright = "2021-2026, JonSnowbd, PhenoM4n4n, inthedark.org, cool-aid-man"
 author = "JonSnowbd, PhenoM4n4n, inthedark.org, cool-aid-man"
 
 
@@ -29,7 +29,6 @@ author = "JonSnowbd, PhenoM4n4n, inthedark.org, cool-aid-man"
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    "recommonmark",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosectionlabel",
     "sphinx.ext.viewcode",
@@ -37,8 +36,8 @@ extensions = [
     "sphinx.ext.intersphinx",
 ]
 
-# Add any paths that contain templates here, relative to this directory.
-templates_path = ["_templates"]
+# No _templates/ directory exists; listing one warns on every build.
+templates_path = []
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -52,14 +51,8 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 # a list of builtin themes.
 
 html_theme = "sphinx_rtd_theme"
-# html_logo = "_static/logo.png"
-# html_favicon = "_static/favicon.ico"
-# html_theme_options = {
-#     "external_links": [
-#         ("Github", "https://github.com/cool-aid-man/TagScriptEngine"),
-#         ("Discord", "https://discord.gg/AyMrA7KMSp"),
-#     ]
-# }
+html_logo = "_static/logo.png"
+html_favicon = "_static/favicon.ico"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,

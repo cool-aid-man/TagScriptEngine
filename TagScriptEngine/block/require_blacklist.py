@@ -5,7 +5,6 @@ from typing import Optional, Tuple, cast
 from ..interface import verb_required_block
 from ..interpreter import Context
 
-
 __all__: Tuple[str, ...] = ("RequireBlock", "BlacklistBlock")
 
 
@@ -37,7 +36,9 @@ class RequireBlock(verb_required_block(True, parameter=True)):  # type: ignore
     def process(self, ctx: Context) -> Optional[str]:
         actions = ctx.response.actions.get("requires")
         if actions:
-            return None
+            # First one wins, but still consume it - None means "not handled"
+            # and leaks the raw `{require(...)}` into the output.
+            return ""
         ctx.response.actions["requires"] = {
             "items": [i.strip() for i in cast(str, ctx.verb.parameter).split(",")],
             "response": ctx.verb.payload,
@@ -71,7 +72,8 @@ class BlacklistBlock(verb_required_block(True, parameter=True)):  # type: ignore
     def process(self, ctx: Context) -> Optional[str]:
         actions = ctx.response.actions.get("blacklist")
         if actions:
-            return None
+            # See RequireBlock: consume the repeat rather than leaking it.
+            return ""
         ctx.response.actions["blacklist"] = {
             "items": [i.strip() for i in cast(str, ctx.verb.parameter).split(",")],
             "response": ctx.verb.payload,

@@ -5,8 +5,7 @@ from typing import Optional, Tuple, cast
 from ..interface import verb_required_block
 from ..interpreter import Context
 
-
-__all__: Tuple[str, ...] = ("OrdBlock",)
+__all__: Tuple[str, ...] = ("OrdinalBlock",)
 
 
 def _ordinal(n: int) -> str:
@@ -55,8 +54,9 @@ class OrdinalBlock(verb_required_block(True, payload=True)):  # type: ignore
     ACCEPTED_NAMES: Tuple[str, ...] = ("ordinal", "ord")
 
     def process(self, ctx: Context) -> Optional[str]:
+        raw = cast(str, ctx.verb.payload).strip()
         try:
-            number = int(cast(str, ctx.verb.payload).strip())
+            number = int(raw)
         except (ValueError, TypeError):
-            return None
+            return f'Ordinal Error: "{raw}" is not a number'
         return _ordinal(number)

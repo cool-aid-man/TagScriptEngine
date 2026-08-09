@@ -6,7 +6,6 @@ from typing import Optional, Tuple
 from ..interface import verb_required_block
 from ..interpreter import Context
 
-
 __all__: Tuple[str, ...] = ("FiftyFiftyBlock",)
 
 

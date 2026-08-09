@@ -2,17 +2,17 @@ from __future__ import annotations
 
 from typing import Optional, Tuple, cast
 
-from ..interface import verb_required_block, Block
+from ..interface import Block, verb_required_block
 from ..interpreter import Context
 from . import helper_parse_if, helper_parse_list_if, helper_split
-
 
 __all__: Tuple[str, ...] = ("AnyBlock", "AllBlock", "IfBlock")
 
 
 def parse_into_output(payload: str, result: Optional[bool]) -> Optional[str]:
+    # Unparseable is not a match, so it takes the else branch - same as false.
     if result is None:
-        return
+        result = False
     try:
         output = helper_split(payload, False)
         if output is not None and len(output) == 2:

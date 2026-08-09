@@ -1,9 +1,7 @@
-discord.py
-Jinja2<3.1
-pyparsing
-recommonmark
-Sphinx
+Sphinx>=7,<9
 sphinx_rtd_theme
-sphinx-book-theme
-sphinx-material
-sphinx-press-theme
+
+# Imported by TagScriptEngine at module scope, so autodoc needs them installed.
+discord.py>=2.7.1
+pyparsing
+typing_extensions

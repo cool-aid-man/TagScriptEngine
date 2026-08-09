@@ -5,7 +5,6 @@ from typing import Optional, Tuple, cast
 from ..interface import verb_required_block
 from ..interpreter import Context
 
-
 __all__: Tuple[str, ...] = ("ListBlock",)
 
 
@@ -63,4 +62,6 @@ class ListBlock(verb_required_block(True, payload=True, parameter=True)):  # typ
         try:
             return items[index]
         except IndexError:
-            return None
+            # Documented as returning null - render nothing rather than
+            # echoing the raw block.
+            return ""

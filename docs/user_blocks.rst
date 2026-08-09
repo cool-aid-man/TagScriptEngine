@@ -50,21 +50,26 @@ Component Block
 
 .. autoclass:: TagScriptEngine.block.ComponentBlock
 
---------------
-Contains Block
---------------
+.. rubric:: Rendering the layout
 
-The ``contains`` block strictly checks if the parameter is in the payload,
-split by whitespace. This performs **exact** matching on whitespace-split words.
+A Components V2 message cannot carry a normal ``content`` field, so the block
+only *accumulates* a layout under the ``components_v2`` response action. The
+host turns it into a view at send time:
 
-**Usage:** ``{contains(<string>):<payload>}``
+.. code-block:: python
 
-**Examples:** ::
+    layout = response.actions.get("components_v2")
+    if layout:
+        view = tse.build_components_v2_view(layout, leading_content=response.body)
+        await channel.send(view=view)
 
-    {contains(mute):How does it feel to be muted?}
-    # false
-    {contains(muted?):How does it feel to be muted?}
-    # true
+.. autofunction:: TagScriptEngine.block.build_components_v2_view
+
+---------------------------
+In / Contains / Index Block
+---------------------------
+
+.. autoclass:: TagScriptEngine.block.PythonBlock
 
 -----------
 Count Block
@@ -102,36 +107,9 @@ If Block
 
 .. autoclass:: TagScriptEngine.block.IfBlock
 
---------
-In Block
---------
-
-The ``in`` block checks if the parameter string is anywhere in the payload as a substring.
-
-**Usage:** ``{in(<string>):<payload>}``
-
-**Examples:** ::
-
-    {in(apple pie):banana pie apple pie and other pie}
-    # true
-    {in(mute):How does it feel to be muted?}
-    # true
-
------------
-Index Block
------------
-
-The ``index`` block finds the location/index of the parameter in the payload,
-split by whitespace. Returns ``-1`` if not found. Performs **exact** matching.
-
-**Usage:** ``{index(<string>):<payload>}``
-
-**Examples:** ::
-
-    {index(food):I love to eat food everyone does}
-    # 4
-    {index(pie):I love to eat food}
-    # -1
+.. note::
+    ``in``, ``contains`` and ``index`` are three aliases of one block -- see
+    `In / Contains / Index Block`_ above.
 
 ----------
 Join Block
@@ -216,6 +194,12 @@ ShortCutRedirect Block
 ----------------------
 
 .. autoclass:: TagScriptEngine.block.ShortCutRedirectBlock
+
+-----------
+Sleep Block
+-----------
+
+.. autoclass:: TagScriptEngine.block.SleepBlock
 
 ----------
 STRF Block

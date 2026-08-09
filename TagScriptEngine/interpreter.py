@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+from inspect import isawaitable
 from itertools import islice
-from typing import Any, Dict, List, Optional, Protocol, Tuple, cast
+from typing import Any, Dict, List, Optional, Tuple, cast
+
 from typing_extensions import TypeAlias
 
 from .exceptions import (
@@ -30,15 +32,7 @@ AdapterDict: TypeAlias = Dict[str, Adapter]
 AnyDict: TypeAlias = Dict[str, Any]
 
 
-class _Node(Protocol):
-    def __init__(self, coordinates: Tuple[int, int], verb: Optional[Verb] = None) -> None: ...
-
-    def __str__(self) -> str: ...
-
-    def __repr__(self) -> str: ...
-
-
-class Node(_Node):
+class Node:
     """
     A low-level object representing a bracketed block.
 
@@ -79,9 +73,9 @@ def build_node_tree(message: str) -> List[Node]:
     previous: str = r""
     starts: List[int] = []
     for idx, char in enumerate(message):
-        if char == "{" and previous != r"\\":
+        if char == "{" and previous != "\\":
             starts.append(idx)
-        if char == "}" and previous != r"\\":
+        if char == "}" and previous != "\\":
             if not starts:
                 continue
             coords: Tuple[int, int] = (starts.pop(), idx)
@@ -91,18 +85,7 @@ def build_node_tree(message: str) -> List[Node]:
     return nodes
 
 
-class _Response(Protocol):
-    def __init__(
-        self,
-        *,
-        variables: Optional[AdapterDict] = None,
-        extra_kwargs: Optional[AnyDict] = None,
-    ) -> None: ...
-
-    def __repr__(self) -> str: ...
-
-
-class Response(_Response):
+class Response:
     """
     An object containing information on a completed TagScript process.
 
@@ -137,13 +120,7 @@ class Response(_Response):
         )
 
 
-class _Context(Protocol):
-    def __init__(self, verb: Verb, res: Response, interpreter: Interpreter, og: str) -> None: ...
-
-    def __repr__(self) -> str: ...
-
-
-class Context(_Context):
+class Context:
     """
     An object containing data on the TagScript block processed by the interpreter.
     This class is passed to adapters and blocks during processing.
@@ -170,63 +147,7 @@ class Context(_Context):
         return f"<Context verb={self.verb!r}>"
 
 
-class _Interpreter(Protocol):
-    def __init__(self, blocks: List[Block]) -> None: ...
-
-    def __repr__(self) -> str: ...
-
-    def _get_context(
-        self,
-        node: Node,
-        final: str,
-        *,
-        response: Response,
-        original_message: str,
-        verb_limit: int,
-        dot_parameter: bool,
-    ) -> Context: ...
-
-    def _get_acceptors(self, ctx: Context) -> List[Block]: ...
-
-    def _process_blocks(self, ctx: Context, node: Node) -> Optional[str]: ...
-
-    @staticmethod
-    def _check_workload(charlimit: int, total_work: int, output: str) -> Optional[int]: ...
-
-    @staticmethod
-    def _text_deform(start: int, end: int, final: str, output: str) -> Tuple[str, int]: ...
-
-    @staticmethod
-    def _translate_nodes(
-        node_ordered_list: List[Node], index: int, start: int, differential: int
-    ) -> None: ...
-
-    def _solve(
-        self,
-        message: str,
-        node_ordered_list: List[Node],
-        response: Response,
-        *,
-        charlimit: int,
-        verb_limit: int = 6000,
-        dot_parameter: bool,
-    ) -> str: ...
-
-    @staticmethod
-    def _return_response(response: Response, output: str) -> Response: ...
-
-    def process(
-        self,
-        message: str,
-        seed_variables: Optional[AdapterDict] = None,
-        *,
-        charlimit: Optional[int] = None,
-        dot_parameter: bool = False,
-        **kwargs: Any,
-    ) -> Response: ...
-
-
-class Interpreter(_Interpreter):
+class Interpreter:
     """
     The TagScript interpreter.
 
@@ -268,6 +189,15 @@ class Interpreter(_Interpreter):
         acceptors = self._get_acceptors(ctx)
         for b in acceptors:
             value = b.process(ctx)
+            if isawaitable(value):
+                raise ProcessError(
+                    TypeError(
+                        f"{type(b).__name__}.process returned an awaitable; "
+                        "use AsyncInterpreter for async blocks"
+                    ),
+                    ctx.response,
+                    self,
+                )
             if value is not None:  # Value found? We're done here.
                 value = str(value)
                 node.output = value

@@ -94,7 +94,8 @@ class OverrideBlock(Block):
 
         param = param.strip().lower()
         if param not in ("admin", "mod", "permissions"):
-            return None
+            # Consume it - None would echo the raw block into the message.
+            return ""
         overrides = ctx.response.actions.get(
             "overrides", {"admin": False, "mod": False, "permissions": False}
         )
@@ -129,8 +130,10 @@ class SequentialGather(Awaitable[T]):
 
     async def __aenter__(self) -> List[T]:
         async with self.__lock:
-            for coro in self.__iterator:
-                await asyncio.sleep(0.10)
+            for index, coro in enumerate(self.__iterator):
+                if index:
+                    # Space out consecutive awaitables to avoid rate-limit bursts.
+                    await asyncio.sleep(0.10)
                 result: T = await coro
                 self.__results.append(result)
         return self.__results

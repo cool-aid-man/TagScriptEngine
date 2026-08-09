@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from typing import Tuple
+from typing import Optional, Tuple
 
 from ..interface import Block
 from ..interpreter import Context
-
 
 __all__: Tuple[str, ...] = ("UpperBlock", "LowerBlock")
 
@@ -32,9 +31,11 @@ class UpperBlock(Block):
 
     ACCEPTED_NAMES: Tuple[str, ...] = ("upper", "uppercase")
 
-    def process(self, ctx: Context) -> str:
-        text = str(ctx.verb.parameter).upper()
-        return "" if text == "NONE" else text
+    def process(self, ctx: Context) -> Optional[str]:
+        # Consume bare `{upper}` to prevent raw block leaks; variable name collisions are discouraged anyway.
+        if ctx.verb.parameter is None:
+            return ""
+        return ctx.verb.parameter.upper()
 
 
 class LowerBlock(Block):
@@ -60,6 +61,8 @@ class LowerBlock(Block):
 
     ACCEPTED_NAMES: Tuple[str, ...] = ("lower", "lowercase")
 
-    def process(self, ctx: Context) -> str:
-        text = str(ctx.verb.parameter).lower()
-        return "" if text == "none" else text
+    def process(self, ctx: Context) -> Optional[str]:
+        # See UpperBlock.
+        if ctx.verb.parameter is None:
+            return ""
+        return ctx.verb.parameter.lower()

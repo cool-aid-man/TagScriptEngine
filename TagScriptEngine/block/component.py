@@ -10,14 +10,13 @@ from ..interface import Block
 from ..interpreter import Context
 from .helpers import helper_split
 
-
 __all__: Tuple[str, ...] = ("ComponentBlock", "build_components_v2_view")
 
 # Discord components v2 text limit
 TEXT_LIMIT: int = 4000
 
-# Discord allows at most 40 total components per message.
-# One slot is reserved for the plain-output text block.
+# Discord limits messages to 40 components (including nested).
+# Reserve 1 slot for plain-text output folded in at send time.
 MAX_COMPONENTS: int = 40
 
 # A single media gallery holds at most 10 items.
@@ -41,6 +40,12 @@ class ComponentBlock(Block):
     message in the tag response. It is the text-only counterpart of the embed
     block: it accepts manual attributes that are accumulated, in order, into a
     single layout stored under the ``components_v2`` response action.
+
+    The accumulated layout is turned into a :class:`discord.ui.LayoutView` by
+    :func:`build_components_v2_view`, which the host (e.g. a Red cog) calls at
+    send time - passing any plain tag output as ``leading_content`` so it is
+    folded in as the first text block rather than lost (a Components V2 message
+    cannot carry a normal ``content`` field).
 
     .. important::
         - A Components V2 message **cannot** be combined with a normal embed
@@ -82,7 +87,7 @@ class ComponentBlock(Block):
 
     **Usage:** ``{component(<attribute>):<value>}``
 
-    **Aliases:** ``cv2``, ``c2``
+    **Aliases:** ``comp``, ``cv2``, ``c2``
 
     **Payload:** value
 
@@ -116,7 +121,7 @@ class ComponentBlock(Block):
 
     """
 
-    ACCEPTED_NAMES: Tuple[str, ...] = ("component", "cv2", "c2")
+    ACCEPTED_NAMES: Tuple[str, ...] = ("component", "comp", "cv2", "c2")
 
     ATTRIBUTES: Tuple[str, ...] = (
         "text",
@@ -154,6 +159,8 @@ class ComponentBlock(Block):
 
     @staticmethod
     def _component_count(layout: Dict[str, Any]) -> int:
+        # Mirrors how the layout renders into discord components so the
+        # 40-component cap can be enforced before the message is built.
         count = 1 if layout["framed"] else 0  # the wrapping container
         for item in layout["items"]:
             kind = item["type"]
@@ -176,7 +183,8 @@ class ComponentBlock(Block):
 
         if attribute == "text":
             if payload is None:
-                return None
+                # Consume it - None would echo the raw block into the message.
+                return ""
             if self._total_text(layout) + len(payload) > TEXT_LIMIT:
                 return f"`MAX COMPONENT TEXT LENGTH REACHED ({TEXT_LIMIT})`"
             if self._at_component_limit(layout):
@@ -196,7 +204,8 @@ class ComponentBlock(Block):
 
         if attribute in ("color", "colour"):
             if not payload:
-                return None
+                # Consume it - None would echo the raw block into the message.
+                return ""
             try:
                 color = self._parse_color(payload)
             except ComponentParseError as error:
@@ -211,14 +220,13 @@ class ComponentBlock(Block):
                 return f"`MAX COMPONENT COUNT REACHED ({MAX_COMPONENTS})`"
             keyword = (payload or "").strip().lower()
             visible, large = SEPARATOR_KEYWORDS.get(keyword, (True, False))
-            layout["items"].append(
-                {"type": "separator", "visible": visible, "large": large}
-            )
+            layout["items"].append({"type": "separator", "visible": visible, "large": large})
             return ""
 
         if attribute == "thumbnail":
             if not payload:
-                return None
+                # Consume it - None would echo the raw block into the message.
+                return ""
             # Attach to the most recent text block, converting it to a section.
             for item in reversed(layout["items"]):
                 if item["type"] == "text":
@@ -229,21 +237,20 @@ class ComponentBlock(Block):
                 # A fresh section costs two components (section + thumbnail).
                 if self._at_component_limit(layout, adding=2):
                     return f"`MAX COMPONENT COUNT REACHED ({MAX_COMPONENTS})`"
-                layout["items"].append(
-                    {"type": "section", "content": "", "thumbnail": payload}
-                )
+                layout["items"].append({"type": "section", "content": "", "thumbnail": payload})
             return ""
 
         if attribute == "image":
             if not payload:
-                return None
+                # Consume it - None would echo the raw block into the message.
+                return ""
             # Delimiters: ;; takes priority (same as embed fields); when ;; is
             # present, | and ~ are not used. Otherwise split on | or ~.
             split = helper_split(payload, double_semicolon=True)
             raw = split if split is not None else [payload]
             urls = [url.strip() for url in raw if url.strip()]
             if not urls:
-                return None
+                return ""
             # Only coalesce into the previous gallery when it is the most recent
             # item, so images keep document order relative to other blocks.
             items = layout["items"]
@@ -263,7 +270,7 @@ class ComponentBlock(Block):
                 gallery["urls"].append(url)
             return ""
 
-        return None
+        return ""
 
     @staticmethod
     def return_error(error: Exception) -> str:
@@ -271,8 +278,8 @@ class ComponentBlock(Block):
 
     @staticmethod
     def _parse_color(argument: str) -> int:
-        # A hex literal, or the name of any `discord.Colour` classmethod that isn't a
-        # `from_*` constructor.
+        # Accepts hex literals or non-`from_*` `discord.Colour` classmethods (matches embed block colour).
+        # Resolved dynamically at runtime to track discord.py updates.
         arg = argument.strip().replace("0x", "").lstrip("#").lower()
         if not arg:
             raise ComponentParseError(f'Colour "{argument}" is invalid.')
@@ -305,11 +312,7 @@ def build_components_v2_view(
     """
     items: List[Dict[str, Any]] = []
     if leading_content:
-        used = sum(
-            len(i["content"])
-            for i in layout["items"]
-            if i["type"] in ("text", "section")
-        )
+        used = sum(len(i["content"]) for i in layout["items"] if i["type"] in ("text", "section"))
         remaining = TEXT_LIMIT - used
         if remaining <= 0:
             leading_content = None
@@ -327,24 +330,16 @@ def build_components_v2_view(
         elif kind == "section":
             text = item.get("content") or "​"
             children.append(
-                discord.ui.Section(
-                    text, accessory=discord.ui.Thumbnail(item["thumbnail"])
-                )
+                discord.ui.Section(text, accessory=discord.ui.Thumbnail(item["thumbnail"]))
             )
         elif kind == "separator":
             spacing = (
-                discord.SeparatorSpacing.large
-                if item["large"]
-                else discord.SeparatorSpacing.small
+                discord.SeparatorSpacing.large if item["large"] else discord.SeparatorSpacing.small
             )
-            children.append(
-                discord.ui.Separator(visible=item["visible"], spacing=spacing)
-            )
+            children.append(discord.ui.Separator(visible=item["visible"], spacing=spacing))
         elif kind == "gallery":
             children.append(
-                discord.ui.MediaGallery(
-                    *[discord.MediaGalleryItem(url) for url in item["urls"]]
-                )
+                discord.ui.MediaGallery(*[discord.MediaGalleryItem(url) for url in item["urls"]])
             )
 
     if not children:

@@ -55,9 +55,11 @@ use.
 
 ## Dependencies
 
-`Python 3.8+`
+`Python 3.9+`
 
 `pyparsing`
+
+`typing_extensions`
 
 `discord.py`
 

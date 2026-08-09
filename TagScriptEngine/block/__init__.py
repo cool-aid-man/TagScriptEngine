@@ -20,22 +20,47 @@ from .assign import (
 from .breakblock import (
     BreakBlock as BreakBlock,
 )
+from .case import (
+    LowerBlock as LowerBlock,
+)
+from .case import (
+    UpperBlock as UpperBlock,
+)
 from .command import (
     CommandBlock as CommandBlock,
+)
+from .command import (
     OverrideBlock as OverrideBlock,
+)
+from .command import (
     SequentialGather as SequentialGather,
 )
 from .component import (
     ComponentBlock as ComponentBlock,
+)
+from .component import (
     build_components_v2_view as build_components_v2_view,
 )
 from .control import (
     AllBlock as AllBlock,
+)
+from .control import (
     AnyBlock as AnyBlock,
+)
+from .control import (
     IfBlock as IfBlock,
 )
 from .cooldown import (
     CooldownBlock as CooldownBlock,
+)
+from .count import (
+    CountBlock as CountBlock,
+)
+from .count import (
+    LengthBlock as LengthBlock,
+)
+from .cycleblock import (
+    CycleBlock as CycleBlock,
 )
 from .embedblock import (
     EmbedBlock as EmbedBlock,
@@ -43,11 +68,20 @@ from .embedblock import (
 from .fiftyfifty import (
     FiftyFiftyBlock as FiftyFiftyBlock,
 )
+from .joinblock import (
+    JoinBlock as JoinBlock,
+)
+from .listblock import (
+    ListBlock as ListBlock,
+)
 from .loosevariablegetter import (
     LooseVariableGetterBlock as LooseVariableGetterBlock,
 )
 from .mathblock import (
     MathBlock as MathBlock,
+)
+from .ordblock import (
+    OrdinalBlock as OrdinalBlock,
 )
 from .randomblock import (
     RandomBlock as RandomBlock,
@@ -60,14 +94,21 @@ from .redirect import (
 )
 from .replaceblock import (
     PythonBlock as PythonBlock,
+)
+from .replaceblock import (
     ReplaceBlock as ReplaceBlock,
 )
 from .require_blacklist import (
     BlacklistBlock as BlacklistBlock,
+)
+from .require_blacklist import (
     RequireBlock as RequireBlock,
 )
 from .shortcutredirect import (
     ShortCutRedirectBlock as ShortCutRedirectBlock,
+)
+from .sleep import (
+    SleepBlock as SleepBlock,
 )
 from .stopblock import (
     StopBlock as StopBlock,
@@ -83,26 +124,6 @@ from .substr import (
 )
 from .urlencodeblock import (
     URLEncodeBlock as URLEncodeBlock,
-)
-from .case import (
-    UpperBlock as UpperBlock,
-    LowerBlock as LowerBlock,
-)
-from .count import (
-    CountBlock as CountBlock,
-    LengthBlock as LengthBlock,
-)
-from .joinblock import (
-    JoinBlock as JoinBlock,
-)
-from .listblock import (
-    ListBlock as ListBlock,
-)
-from .cycleblock import (
-    CycleBlock as CycleBlock,
-)
-from .ordblock import (
-    OrdinalBlock as OrdinalBlock,
 )
 
 __all__: Tuple[str, ...] = (
@@ -134,6 +155,7 @@ __all__: Tuple[str, ...] = (
     "ReplaceBlock",
     "RequireBlock",
     "ShortCutRedirectBlock",
+    "SleepBlock",
     "StopBlock",
     "StrfBlock",
     "StrictVariableGetterBlock",
